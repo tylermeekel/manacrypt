@@ -1,5 +1,6 @@
 import decode/zero
 import gleam/int
+import gleam/json
 import gleam/list
 import gleam/uri
 import lustre
@@ -9,9 +10,13 @@ import lustre/element
 import lustre/element/html
 import lustre/event
 import lustre_http
-import mc_shared.{type Card, Card}
+import mc_shared.{type Card, Card} as shared
 
 pub const api_base_url = "http://localhost:8000/v1"
+
+// FFI
+@external(javascript, "./ffi.mjs", "downloadObjectAsJson")
+fn download_object_as_json(json_string: String, export_name: String) -> Nil
 
 // ------ MAIN ------
 pub fn main() {
@@ -53,7 +58,16 @@ fn collection_view(collection: List(Card)) {
       html.h1([attribute.class("text-center font-bold text-3xl")], [
         element.text("Collection List"),
       ]),
-      html.div([], [collection_cards_list_view(collection)]),
+      html.div([], [
+        html.button(
+          [
+            attribute.class("text-white rounded-md px-2 bg-slate-600"),
+            event.on_click(UserClickedExportButton),
+          ],
+          [element.text("Export Data")],
+        ),
+        collection_cards_list_view(collection),
+      ]),
     ],
   )
 }
@@ -175,6 +189,7 @@ type Msg {
   UserDecreasedCountSearchedCard(card_id: String)
   UserIncreasedCountCollectionCard(card_id: String)
   UserDecreasedCountCollectionCard(card_id: String)
+  UserClickedExportButton
 
   // Backend Msgs
   ApiReturnedSearchedCards(cards: Result(List(Card), lustre_http.HttpError))
@@ -277,6 +292,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         })
       #(Model(..model, collection: updated_cards), effect.none())
     }
+    UserClickedExportButton -> {
+      let json_string = cards_to_json_string(model.collection)
+      download_object_as_json(json_string, "cards")
+      #(model, effect.none())
+    }
     // API Msgs
     ApiReturnedSearchedCards(cards_result) -> {
       case cards_result {
@@ -306,4 +326,10 @@ fn get_cards(search_query: String) -> Effect(Msg) {
       ApiReturnedSearchedCards,
     ),
   )
+}
+
+// ------ UTIL ------
+fn cards_to_json_string(cards: List(Card)) -> String {
+  json.array(cards, shared.card_to_json)
+  |> json.to_string
 }
