@@ -1,5 +1,6 @@
 import decode/zero
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/uri
 import lustre
@@ -64,15 +65,20 @@ fn collection_cards_list_view(cards: List(Card)) {
     list.map(cards, fn(card) {
       let card_count_text = int.to_string(card.count)
 
+      let reduce_button_text = case card.count {
+        1 -> "Remove"
+        _ -> "-"
+      }
+
       html.li([attribute.class("flex p-2 justify-between hover:bg-slate-400")], [
         html.div([], [element.text(card.name)]),
         html.div([attribute.class("flex gap-2")], [
           html.button(
             [
-              attribute.class("bg-slate-600 text-white rounded-md px-2"),
+              attribute.class("text-white rounded-md px-2 bg-slate-600"),
               event.on_click(UserDecreasedCountCollectionCard(card.id)),
             ],
-            [element.text("-")],
+            [element.text(reduce_button_text)],
           ),
           html.p([attribute.class("bg-slate-600 text-white rounded-md px-2")], [
             element.text(card_count_text),
@@ -240,14 +246,27 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       #(Model(..model, searched_cards: updated_cards), effect.none())
     }
     UserDecreasedCountCollectionCard(card_id) -> {
-      let updated_cards =
-        list.map(model.collection, fn(card) {
-          case card.id == card_id {
-            False -> card
-            True -> Card(..card, count: card.count - 1)
-          }
-        })
-      #(Model(..model, collection: updated_cards), effect.none())
+      let assert Ok(card) =
+        list.find(model.collection, fn(card) { card.id == card_id })
+
+      case card.count == 1 {
+        False -> {
+          let updated_cards =
+            list.map(model.collection, fn(card) {
+              case card.id == card_id {
+                False -> card
+                True -> Card(..card, count: card.count - 1)
+              }
+            })
+          #(Model(..model, collection: updated_cards), effect.none())
+        }
+        True -> {
+          let updated_cards =
+            list.filter(model.collection, fn(card) { card.id != card_id })
+
+          #(Model(..model, collection: updated_cards), effect.none())
+        }
+      }
     }
     UserIncreasedCountCollectionCard(card_id) -> {
       let updated_cards =

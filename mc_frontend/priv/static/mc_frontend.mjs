@@ -309,6 +309,33 @@ function reverse_loop(loop$remaining, loop$accumulator) {
 function reverse(list3) {
   return reverse_loop(list3, toList([]));
 }
+function filter_loop(loop$list, loop$fun, loop$acc) {
+  while (true) {
+    let list3 = loop$list;
+    let fun = loop$fun;
+    let acc = loop$acc;
+    if (list3.hasLength(0)) {
+      return reverse(acc);
+    } else {
+      let first$1 = list3.head;
+      let rest$1 = list3.tail;
+      let new_acc = (() => {
+        let $ = fun(first$1);
+        if ($) {
+          return prepend(first$1, acc);
+        } else {
+          return acc;
+        }
+      })();
+      loop$list = rest$1;
+      loop$fun = fun;
+      loop$acc = new_acc;
+    }
+  }
+}
+function filter(list3, predicate) {
+  return filter_loop(list3, predicate, toList([]));
+}
 function map_loop(loop$list, loop$fun, loop$acc) {
   while (true) {
     let list3 = loop$list;
@@ -381,6 +408,25 @@ function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
 }
 function index_fold(list3, initial, fun) {
   return index_fold_loop(list3, initial, fun, 0);
+}
+function find(loop$list, loop$is_desired) {
+  while (true) {
+    let list3 = loop$list;
+    let is_desired = loop$is_desired;
+    if (list3.hasLength(0)) {
+      return new Error(void 0);
+    } else {
+      let x = list3.head;
+      let rest$1 = list3.tail;
+      let $ = is_desired(x);
+      if ($) {
+        return new Ok(x);
+      } else {
+        loop$list = rest$1;
+        loop$is_desired = is_desired;
+      }
+    }
+  }
 }
 function any(loop$list, loop$predicate) {
   while (true) {
@@ -922,7 +968,7 @@ function collisionIndexOf(root, key) {
   }
   return -1;
 }
-function find(root, shift, hash, key) {
+function find2(root, shift, hash, key) {
   switch (root.type) {
     case ARRAY_NODE:
       return findArray(root, shift, hash, key);
@@ -939,7 +985,7 @@ function findArray(root, shift, hash, key) {
     return void 0;
   }
   if (node.type !== ENTRY) {
-    return find(node, shift + SHIFT, hash, key);
+    return find2(node, shift + SHIFT, hash, key);
   }
   if (isEqual(key, node.k)) {
     return node;
@@ -954,7 +1000,7 @@ function findIndex(root, shift, hash, key) {
   const idx = index(root.bitmap, bit);
   const node = root.array[idx];
   if (node.type !== ENTRY) {
-    return find(node, shift + SHIFT, hash, key);
+    return find2(node, shift + SHIFT, hash, key);
   }
   if (isEqual(key, node.k)) {
     return node;
@@ -1159,7 +1205,7 @@ var Dict = class _Dict {
     if (this.root === void 0) {
       return notFound;
     }
-    const found = find(this.root, 0, getHash(key), key);
+    const found = find2(this.root, 0, getHash(key), key);
     if (found === void 0) {
       return notFound;
     }
@@ -1204,7 +1250,7 @@ var Dict = class _Dict {
     if (this.root === void 0) {
       return false;
     }
-    return find(this.root, 0, getHash(key), key) !== void 0;
+    return find2(this.root, 0, getHash(key), key) !== void 0;
   }
   /**
    * @returns {[K,V][]}
@@ -3678,6 +3724,14 @@ function collection_cards_list_view(cards) {
       cards,
       (card) => {
         let card_count_text = to_string(card.count);
+        let reduce_button_text = (() => {
+          let $ = card.count;
+          if ($ === 1) {
+            return "Remove";
+          } else {
+            return "-";
+          }
+        })();
         return li(
           toList([
             class$("flex p-2 justify-between hover:bg-slate-400")
@@ -3689,12 +3743,12 @@ function collection_cards_list_view(cards) {
               toList([
                 button(
                   toList([
-                    class$("bg-slate-600 text-white rounded-md px-2"),
+                    class$("text-white rounded-md px-2 bg-slate-600"),
                     on_click(
                       new UserDecreasedCountCollectionCard(card.id)
                     )
                   ]),
-                  toList([text("-")])
+                  toList([text(reduce_button_text)])
                 ),
                 p(
                   toList([
@@ -3944,18 +3998,46 @@ function update(model, msg) {
     return [model.withFields({ searched_cards: updated_cards }), none()];
   } else if (msg instanceof UserDecreasedCountCollectionCard) {
     let card_id = msg.card_id;
-    let updated_cards = map(
+    let $ = find(
       model.collection,
-      (card) => {
-        let $ = card.id === card_id;
-        if (!$) {
-          return card;
-        } else {
-          return card.withFields({ count: card.count - 1 });
-        }
+      (card2) => {
+        return card2.id === card_id;
       }
     );
-    return [model.withFields({ collection: updated_cards }), none()];
+    if (!$.isOk()) {
+      throw makeError(
+        "let_assert",
+        "mc_frontend",
+        249,
+        "update",
+        "Pattern match failed, no pattern matched the value.",
+        { value: $ }
+      );
+    }
+    let card = $[0];
+    let $1 = card.count === 1;
+    if (!$1) {
+      let updated_cards = map(
+        model.collection,
+        (card2) => {
+          let $2 = card2.id === card_id;
+          if (!$2) {
+            return card2;
+          } else {
+            return card2.withFields({ count: card2.count - 1 });
+          }
+        }
+      );
+      return [model.withFields({ collection: updated_cards }), none()];
+    } else {
+      let updated_cards = filter(
+        model.collection,
+        (card2) => {
+          return card2.id !== card_id;
+        }
+      );
+      return [model.withFields({ collection: updated_cards }), none()];
+    }
   } else if (msg instanceof UserIncreasedCountCollectionCard) {
     let card_id = msg.card_id;
     let updated_cards = map(
@@ -3987,7 +4069,7 @@ function main() {
     throw makeError(
       "let_assert",
       "mc_frontend",
-      19,
+      20,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }
