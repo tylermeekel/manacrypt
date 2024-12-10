@@ -1,6 +1,5 @@
 import decode/zero
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/uri
 import lustre

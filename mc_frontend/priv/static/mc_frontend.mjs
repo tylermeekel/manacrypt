@@ -4008,7 +4008,7 @@ function update(model, msg) {
       throw makeError(
         "let_assert",
         "mc_frontend",
-        249,
+        248,
         "update",
         "Pattern match failed, no pattern matched the value.",
         { value: $ }
@@ -4069,7 +4069,7 @@ function main() {
     throw makeError(
       "let_assert",
       "mc_frontend",
-      20,
+      19,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }
