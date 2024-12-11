@@ -8,6 +8,8 @@ import wisp.{type Request, type Response}
 pub fn handle_request(req: Request, api_path: List(String)) -> Response {
   case api_path {
     ["cards"] -> search_cards(req)
+    ["auth", "login"] -> login(req)
+    ["auth", "register"] -> register(req)
     _ -> wisp.not_found()
   }
 }
@@ -16,7 +18,6 @@ fn search_cards(req: Request) -> Response {
   // Middleware
   use <- wisp.require_method(req, http.Get)
 
-  // Function Body
   let search_query_result =
     wisp.get_query(req)
     |> list.key_find("query")
@@ -35,4 +36,12 @@ fn search_cards(req: Request) -> Response {
     }
     Error(_) -> wisp.bad_request()
   }
+}
+
+fn login(req: Request) -> Response {
+  todo
+}
+
+fn register(req: Request) -> Response {
+  todo
 }
