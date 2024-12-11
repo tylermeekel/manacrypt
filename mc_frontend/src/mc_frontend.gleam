@@ -119,6 +119,13 @@ fn login_form_view(model: Model) {
           ],
           [element.text("Login")],
         ),
+        html.button(
+          [
+            attribute.class("text-lg text-white rounded-md px-4 bg-slate-600"),
+            event.on_click(UserClickedRegisterButton),
+          ],
+          [element.text("Register")],
+        ),
       ])
     }
   }
@@ -270,6 +277,7 @@ type Msg {
   UserClickedExportButton
   UserClickedLoginButton
   UserClickedLogoutButton
+  UserClickedRegisterButton
   UserChangedUsernameField(username: String)
   UserChangedPasswordField(password: String)
 
@@ -391,6 +399,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     UserClickedLogoutButton -> {
       // TODO: Clear JWT from localStorage
       #(Model(..model, auth_status: Unauthenticated), effect.none())
+    }
+    UserClickedRegisterButton -> {
+      #(model, do_register(model.login_fields.0, model.login_fields.1))
     }
     UserChangedUsernameField(username) -> {
       #(
