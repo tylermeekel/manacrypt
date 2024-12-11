@@ -278,6 +278,9 @@ type Msg {
   ApiReturnedLoginResponse(
     response: Result(LoginResponse, lustre_http.HttpError),
   )
+  ApiReturnedRegisterResponse(
+    response: Result(RegisterResponse, lustre_http.HttpError),
+  )
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -428,6 +431,26 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         }
       }
     }
+    ApiReturnedRegisterResponse(response_result) -> {
+      case response_result {
+        Error(e) -> {
+          io.debug(e)
+          #(model, effect.none())
+        }
+        Ok(response) -> {
+          case response.success {
+            False -> {
+              // TODO: Add error message!
+              #(model, effect.none())
+            }
+            True -> {
+              // TODO: make it change auth status
+              #(model, effect.none())
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -480,6 +503,36 @@ fn do_login(username: String, password: String) -> Effect(Msg) {
 
 type LoginResponse {
   LoginResponse(success: Bool, jwt: String, errors: List(String))
+}
+
+fn do_register(username: String, password: String) -> Effect(Msg) {
+  let request_body =
+    json.object([
+      #("username", json.string(username)),
+      #("password", json.string(password)),
+    ])
+
+  let url = api_base_url <> "/auth/register"
+
+  let response_decoder = {
+    use success <- zero.field("success", zero.bool)
+    use jwt <- zero.field("jwt", zero.string)
+    use errors <- zero.field("errors", zero.list(zero.string))
+    zero.success(RegisterResponse(success:, jwt:, errors:))
+  }
+
+  lustre_http.post(
+    url,
+    request_body,
+    lustre_http.expect_json(
+      fn(data) { zero.run(data, response_decoder) },
+      ApiReturnedRegisterResponse,
+    ),
+  )
+}
+
+type RegisterResponse {
+  RegisterResponse(success: Bool, jwt: String, errors: List(String))
 }
 
 // ------ UTIL ------
