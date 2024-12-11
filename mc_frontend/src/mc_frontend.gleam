@@ -58,20 +58,23 @@ fn init(_flags) -> #(Model, Effect(a)) {
 
 // ------ VIEW ------
 fn view(model: Model) {
-  html.div([attribute.class("flex flex-col h-screen")], [
-    header_view(model),
-    html.div([attribute.class("flex h-full")], [
-      collection_view(model.collection),
-      search_view(model.search_query, model.searched_cards),
-    ]),
-  ])
+  html.div(
+    [attribute.class("flex flex-col max-h-screen overflow-y-auto h-screen")],
+    [
+      header_view(model),
+      html.div([attribute.class("flex h-full")], [
+        collection_view(model.collection),
+        search_view(model.search_query, model.searched_cards),
+      ]),
+    ],
+  )
 }
 
 fn header_view(model: Model) {
   html.header(
     [
       attribute.class(
-        "flex items-center h-20 px-6 bg-slate-900 justify-between",
+        "flex items-center h-20 px-6 bg-slate-900 justify-between min-h-20",
       ),
     ],
     [
@@ -135,7 +138,7 @@ fn collection_view(collection: List(Card)) {
   html.div(
     [
       attribute.class(
-        "flex-1 gap-2 flex flex-col p-4 max-h-screen overflow-y-auto",
+        "flex-1 gap-2 flex flex-col p-4 max-h-full overflow-y-auto",
       ),
     ],
     [
@@ -197,7 +200,7 @@ fn search_view(search_query: String, searched_cards: List(Card)) {
   html.div(
     [
       attribute.class(
-        "gap-2 flex-1 flex flex-col p-4 bg-slate-200 max-h-screen overflow-y-auto",
+        "gap-2 flex-1 flex flex-col p-4 bg-slate-200 max-h-full overflow-y-auto",
       ),
     ],
     [
