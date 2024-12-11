@@ -1,5 +1,6 @@
 import decode/zero
 import gleam/int
+import gleam/io
 import gleam/json
 import gleam/list
 import gleam/uri
@@ -32,19 +33,95 @@ type Model {
     collection: List(Card),
     searched_cards: List(Card),
     search_query: String,
+    auth_status: AuthenticationStatus,
+    login_fields: #(String, String),
   )
 }
 
+type AuthenticationStatus {
+  Authenticated(jwt: String, username: String)
+  Unauthenticated
+}
+
 fn init(_flags) -> #(Model, Effect(a)) {
-  #(Model([], [], ""), effect.none())
+  #(
+    Model(
+      collection: [],
+      searched_cards: [],
+      search_query: "",
+      auth_status: Unauthenticated,
+      login_fields: #("", ""),
+    ),
+    effect.none(),
+  )
 }
 
 // ------ VIEW ------
 fn view(model: Model) {
-  html.div([attribute.class("flex h-screen")], [
-    collection_view(model.collection),
-    search_view(model.search_query, model.searched_cards),
+  html.div([attribute.class("flex flex-col h-screen")], [
+    header_view(model),
+    html.div([attribute.class("flex h-full")], [
+      collection_view(model.collection),
+      search_view(model.search_query, model.searched_cards),
+    ]),
   ])
+}
+
+fn header_view(model: Model) {
+  html.header(
+    [
+      attribute.class(
+        "flex items-center h-20 px-6 bg-slate-900 justify-between",
+      ),
+    ],
+    [
+      html.h1([attribute.class("text-2xl font-extrabold")], [
+        html.span([attribute.class("text-sky-400")], [element.text("Mana")]),
+        html.span([attribute.class("text-white")], [element.text("crypt")]),
+      ]),
+      login_form_view(model),
+    ],
+  )
+}
+
+fn login_form_view(model: Model) {
+  case model.auth_status {
+    Authenticated(_, _) -> {
+      html.div([attribute.class("flex gap-2")], [
+        html.button(
+          [
+            attribute.class("text-lg text-white rounded-md px-4 bg-slate-600"),
+            event.on_click(UserClickedLogoutButton),
+          ],
+          [element.text("Logout")],
+        ),
+      ])
+    }
+    Unauthenticated -> {
+      html.div([attribute.class("flex gap-2")], [
+        html.input([
+          attribute.class("text-lg rounded-md px-2"),
+          attribute.placeholder("Username"),
+          event.on_input(UserChangedUsernameField),
+          attribute.value(model.login_fields.0),
+        ]),
+        html.input([
+          attribute.class("text-lg rounded-md px-2"),
+          attribute.placeholder("Password"),
+          attribute.type_("password"),
+          event.on_input(UserChangedPasswordField),
+          attribute.value(model.login_fields.1),
+        ]),
+        html.button(
+          [
+            attribute.class("text-lg text-white rounded-md px-4 bg-slate-600"),
+            event.on_click(UserClickedLoginButton),
+          ],
+          [element.text("Login")],
+        ),
+      ])
+    }
+  }
 }
 
 fn collection_view(collection: List(Card)) {
@@ -123,7 +200,8 @@ fn search_view(search_query: String, searched_cards: List(Card)) {
       html.div([attribute.class("flex gap-2")], [
         html.input([
           attribute.value(search_query),
-          attribute.class("basis-4/6 border px-2 border-slate-600 rounded-md"),
+          attribute.class("basis-4/6 px-2 rounded-md"),
+          attribute.placeholder("Card Name"),
           event.on_input(UserTypedInSearchBox),
           event.on_keypress(UserPressedKeyInSearchBox),
         ]),
@@ -190,9 +268,16 @@ type Msg {
   UserIncreasedCountCollectionCard(card_id: String)
   UserDecreasedCountCollectionCard(card_id: String)
   UserClickedExportButton
+  UserClickedLoginButton
+  UserClickedLogoutButton
+  UserChangedUsernameField(username: String)
+  UserChangedPasswordField(password: String)
 
   // Backend Msgs
   ApiReturnedSearchedCards(cards: Result(List(Card), lustre_http.HttpError))
+  ApiReturnedLoginResponse(
+    response: Result(LoginResponse, lustre_http.HttpError),
+  )
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -297,11 +382,50 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       download_object_as_json(json_string, "cards")
       #(model, effect.none())
     }
+    UserClickedLoginButton -> {
+      #(model, do_login(model.login_fields.0, model.login_fields.1))
+    }
+    UserClickedLogoutButton -> {
+      // TODO: Clear JWT from localStorage
+      #(Model(..model, auth_status: Unauthenticated), effect.none())
+    }
+    UserChangedUsernameField(username) -> {
+      #(
+        Model(..model, login_fields: #(username, model.login_fields.1)),
+        effect.none(),
+      )
+    }
+    UserChangedPasswordField(password) -> {
+      #(
+        Model(..model, login_fields: #(model.login_fields.0, password)),
+        effect.none(),
+      )
+    }
     // API Msgs
     ApiReturnedSearchedCards(cards_result) -> {
       case cards_result {
         Ok(cards) -> #(Model(..model, searched_cards: cards), effect.none())
         Error(_) -> #(model, effect.none())
+      }
+    }
+    ApiReturnedLoginResponse(response_result) -> {
+      case response_result {
+        Error(e) -> {
+          io.debug(e)
+          #(model, effect.none())
+        }
+        Ok(response) -> {
+          case response.success {
+            False -> {
+              // TODO: Add error message to login!
+              #(model, effect.none())
+            }
+            True -> {
+              // TODO: make it change auth status
+              #(model, effect.none())
+            }
+          }
+        }
       }
     }
   }
@@ -326,6 +450,36 @@ fn get_cards(search_query: String) -> Effect(Msg) {
       ApiReturnedSearchedCards,
     ),
   )
+}
+
+fn do_login(username: String, password: String) -> Effect(Msg) {
+  let request_body =
+    json.object([
+      #("username", json.string(username)),
+      #("password", json.string(password)),
+    ])
+
+  let url = api_base_url <> "/auth/login"
+
+  let response_decoder = {
+    use success <- zero.field("success", zero.bool)
+    use jwt <- zero.field("jwt", zero.string)
+    use errors <- zero.field("errors", zero.list(zero.string))
+    zero.success(LoginResponse(success:, jwt:, errors:))
+  }
+
+  lustre_http.post(
+    url,
+    request_body,
+    lustre_http.expect_json(
+      fn(data) { zero.run(data, response_decoder) },
+      ApiReturnedLoginResponse,
+    ),
+  )
+}
+
+type LoginResponse {
+  LoginResponse(success: Bool, jwt: String, errors: List(String))
 }
 
 // ------ UTIL ------
