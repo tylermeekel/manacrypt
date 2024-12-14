@@ -1,7 +1,6 @@
 import decode/zero
 import gleam/int
 import gleam/io
-import gleam/javascript/promise
 import gleam/json
 import gleam/list
 import gleam/option
