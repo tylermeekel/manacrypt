@@ -11,7 +11,7 @@ import lustre/element
 import lustre/element/html
 import lustre/event
 import lustre_http
-import mc_shared.{type Card, Card} as shared
+import mc_shared.{type Card, type LoginResponse, type RegisterResponse, Card} as shared
 
 pub const api_base_url = "http://localhost:8000/v1"
 
@@ -502,7 +502,7 @@ fn do_login(username: String, password: String) -> Effect(Msg) {
     use success <- zero.field("success", zero.bool)
     use jwt <- zero.field("jwt", zero.string)
     use errors <- zero.field("errors", zero.list(zero.string))
-    zero.success(LoginResponse(success:, jwt:, errors:))
+    zero.success(shared.LoginResponse(success:, jwt:, errors:))
   }
 
   lustre_http.post(
@@ -513,10 +513,6 @@ fn do_login(username: String, password: String) -> Effect(Msg) {
       ApiReturnedLoginResponse,
     ),
   )
-}
-
-type LoginResponse {
-  LoginResponse(success: Bool, jwt: String, errors: List(String))
 }
 
 fn do_register(username: String, password: String) -> Effect(Msg) {
@@ -532,7 +528,7 @@ fn do_register(username: String, password: String) -> Effect(Msg) {
     use success <- zero.field("success", zero.bool)
     use jwt <- zero.field("jwt", zero.string)
     use errors <- zero.field("errors", zero.list(zero.string))
-    zero.success(RegisterResponse(success:, jwt:, errors:))
+    zero.success(shared.RegisterResponse(success:, jwt:, errors:))
   }
 
   lustre_http.post(
@@ -543,10 +539,6 @@ fn do_register(username: String, password: String) -> Effect(Msg) {
       ApiReturnedRegisterResponse,
     ),
   )
-}
-
-type RegisterResponse {
-  RegisterResponse(success: Bool, jwt: String, errors: List(String))
 }
 
 // ------ UTIL ------
