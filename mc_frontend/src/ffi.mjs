@@ -8,3 +8,7 @@ export function downloadObjectAsJson(jsonString, exportName) {
   downloadAnchorNode.click();
   downloadAnchorNode.remove();
 }
+
+export function sleep(interval, cb) {
+  window.setTimeout(cb, interval);
+}

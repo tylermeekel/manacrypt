@@ -1,8 +1,10 @@
 import decode/zero
 import gleam/int
 import gleam/io
+import gleam/javascript/promise
 import gleam/json
 import gleam/list
+import gleam/option
 import gleam/uri
 import lustre
 import lustre/attribute
@@ -18,6 +20,9 @@ pub const api_base_url = "http://localhost:8000/v1"
 // FFI
 @external(javascript, "./ffi.mjs", "downloadObjectAsJson")
 fn download_object_as_json(json_string: String, export_name: String) -> Nil
+
+@external(javascript, "./ffi.mjs", "sleep")
+fn sleep(interval: Int, cb: fn() -> Nil) -> Nil
 
 // ------ MAIN ------
 pub fn main() {
@@ -35,6 +40,7 @@ type Model {
     search_query: String,
     auth_status: AuthenticationStatus,
     login_fields: #(String, String),
+    toast: option.Option(Toast),
   )
 }
 
@@ -51,6 +57,7 @@ fn init(_flags) -> #(Model, Effect(a)) {
       search_query: "",
       auth_status: Unauthenticated,
       login_fields: #("", ""),
+      toast: option.None,
     ),
     effect.none(),
   )
@@ -66,8 +73,37 @@ fn view(model: Model) {
         collection_view(model.collection),
         search_view(model.search_query, model.searched_cards),
       ]),
+      toast_view(model.toast),
     ],
   )
+}
+
+type Toast {
+  ErrorMessage(message: String)
+  WarningMessage(message: String)
+  SuccessMessage(message: String)
+}
+
+fn toast_view(toast: option.Option(Toast)) {
+  let bg_color = case toast {
+    option.None -> ""
+    option.Some(toast) -> {
+      case toast {
+        ErrorMessage(_) -> "bg-red-400"
+        SuccessMessage(_) -> "bg-green-400"
+        WarningMessage(_) -> "bg-yellow-400"
+      }
+    }
+  }
+
+  case toast {
+    option.None -> html.div([], [])
+    option.Some(toast) ->
+      html.div(
+        [attribute.class("p-4 fixed bottom-4 right-4" <> " " <> bg_color)],
+        [html.p([], [element.text(toast.message)])],
+      )
+  }
 }
 
 fn header_view(model: Model) {
@@ -284,6 +320,10 @@ type Msg {
   UserChangedUsernameField(username: String)
   UserChangedPasswordField(password: String)
 
+  // Frontend Msgs
+  ToastCreated(toast: Toast)
+  ToastTimedOut
+
   // Backend Msgs
   ApiReturnedSearchedCards(cards: Result(List(Card), lustre_http.HttpError))
   ApiReturnedLoginResponse(
@@ -418,6 +458,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         effect.none(),
       )
     }
+    // Frontend Msgs
+    ToastCreated(toast) -> {
+      #(Model(..model, toast: option.Some(toast)), toast_timeout())
+    }
+    ToastTimedOut -> #(Model(..model, toast: option.None), effect.none())
     // API Msgs
     ApiReturnedSearchedCards(cards_result) -> {
       case cards_result {
@@ -552,6 +597,10 @@ fn do_register(username: String, password: String) -> Effect(Msg) {
       ApiReturnedRegisterResponse,
     ),
   )
+}
+
+fn toast_timeout() -> Effect(Msg) {
+  effect.from(fn(dispatch) { sleep(5000, fn() { dispatch(ToastTimedOut) }) })
 }
 
 // ------ UTIL ------
