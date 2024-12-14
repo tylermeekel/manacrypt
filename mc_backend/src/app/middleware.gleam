@@ -7,6 +7,8 @@ fn cors() {
   |> cors.allow_origin("http://localhost:1234")
   |> cors.allow_origin("http://127.0.0.1:1234")
   |> cors.allow_method(http.Get)
+  |> cors.allow_method(http.Post)
+  |> cors.allow_header("content-type")
 }
 
 pub fn middleware(

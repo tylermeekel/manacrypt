@@ -438,8 +438,14 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
               #(model, effect.none())
             }
             True -> {
-              // TODO: make it change auth status
-              #(model, effect.none())
+              // TODO: Get username from response!
+              #(
+                Model(
+                  ..model,
+                  auth_status: Authenticated(jwt: response.jwt, username: ""),
+                ),
+                effect.none(),
+              )
             }
           }
         }
@@ -455,11 +461,18 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
           case response.success {
             False -> {
               // TODO: Add error message!
+              io.println("Error registering")
               #(model, effect.none())
             }
             True -> {
-              // TODO: make it change auth status
-              #(model, effect.none())
+              // TODO: Get username from response!
+              #(
+                Model(
+                  ..model,
+                  auth_status: Authenticated(jwt: response.jwt, username: ""),
+                ),
+                effect.none(),
+              )
             }
           }
         }
