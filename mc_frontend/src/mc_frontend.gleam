@@ -3,7 +3,7 @@ import gleam/int
 import gleam/io
 import gleam/json
 import gleam/list
-import gleam/option
+import gleam/option.{Some}
 import gleam/uri
 import lustre
 import lustre/attribute
@@ -86,7 +86,7 @@ type Toast {
 fn toast_view(toast: option.Option(Toast)) {
   let bg_color = case toast {
     option.None -> ""
-    option.Some(toast) -> {
+    Some(toast) -> {
       case toast {
         ErrorMessage(_) -> "bg-red-400"
         SuccessMessage(_) -> "bg-green-400"
@@ -97,7 +97,7 @@ fn toast_view(toast: option.Option(Toast)) {
 
   case toast {
     option.None -> html.div([], [])
-    option.Some(toast) ->
+    Some(toast) ->
       html.div(
         [attribute.class("p-4 fixed bottom-4 right-4" <> " " <> bg_color)],
         [html.p([], [element.text(toast.message)])],
@@ -459,7 +459,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
     // Frontend Msgs
     ToastCreated(toast) -> {
-      #(Model(..model, toast: option.Some(toast)), toast_timeout())
+      #(Model(..model, toast: Some(toast)), toast_timeout())
     }
     ToastTimedOut -> #(Model(..model, toast: option.None), effect.none())
     // API Msgs
@@ -471,15 +471,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
     ApiReturnedLoginResponse(response_result) -> {
       case response_result {
-        Error(e) -> {
-          io.debug(e)
-          #(model, effect.none())
+        Error(_) -> {
+          #(
+            model,
+            create_toast(ErrorMessage("Error Logging In: Internal Server Error")),
+          )
         }
         Ok(response) -> {
           case response.success {
             False -> {
-              // TODO: Add error message to login!
-              #(model, effect.none())
+              let assert Ok(error) = list.first(response.errors)
+              #(
+                model,
+                create_toast(ErrorMessage("Error Logging In: " <> error)),
+              )
             }
             True -> {
               // TODO: Get username from response!
@@ -497,16 +502,22 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
     ApiReturnedRegisterResponse(response_result) -> {
       case response_result {
-        Error(e) -> {
-          io.debug(e)
-          #(model, effect.none())
+        Error(_) -> {
+          #(
+            model,
+            create_toast(ErrorMessage(
+              "Error Registering: Internal Server Error",
+            )),
+          )
         }
         Ok(response) -> {
           case response.success {
             False -> {
-              // TODO: Add error message!
-              io.println("Error registering")
-              #(model, effect.none())
+              let assert Ok(error) = list.first(response.errors)
+              #(
+                model,
+                create_toast(ErrorMessage("Error Registering: " <> error)),
+              )
             }
             True -> {
               // TODO: Get username from response!
@@ -596,6 +607,10 @@ fn do_register(username: String, password: String) -> Effect(Msg) {
       ApiReturnedRegisterResponse,
     ),
   )
+}
+
+fn create_toast(toast: Toast) -> Effect(Msg) {
+  effect.from(fn(dispatch) { dispatch(ToastCreated(toast)) })
 }
 
 fn toast_timeout() -> Effect(Msg) {

@@ -81,7 +81,14 @@ fn login(req: Request, db: pog.Connection) -> Response {
         }
         Ok(pog.Returned(row_count, _)) -> {
           case row_count > 0 {
-            False -> #(LoginResponse(False, "", ["Unauthorized"]), 401)
+            // A no-match (no user-pass combination) has to return a 200
+            // because I want to be able to handle the error message from
+            // the backend, and lustre gets rid of the response if it returns
+            // a 401. >:(
+            False -> #(
+              LoginResponse(False, "", ["Incorrect Username or Password"]),
+              200,
+            )
             True -> #(LoginResponse(True, "", ["Logged In!"]), 200)
           }
         }
@@ -126,7 +133,7 @@ fn register(req: Request, db: pog.Connection) -> Response {
           case row_count > 0 {
             True -> #(
               RegisterResponse(False, "", ["Username Already Exists"]),
-              409,
+              200,
             )
             False -> create_user(requested_username, requested_password, db)
           }
